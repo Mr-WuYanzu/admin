@@ -70,9 +70,20 @@ class GoodsController extends Controller
 
     }
     public function test(){
-        $order_son_id = Redis::get('order:son:id');
+        $order_sonId = Redis::get('order:son:id');
+        $o_id = DB::selectOne('select max(o_id) o_id from (select max(o_id) o_id from shop_order_son_00 UNION All
+                                    select max(o_id) o_id from shop_order_son_business_01 union all
+                                    select max(o_id) o_id from shop_order_son_business_02 union all
+                                    select max(o_id) o_id from shop_order_son_business_03 union all
+                                    select max(o_id) o_id from shop_order_son_business_04 union all
+                                    select max(o_id) o_id from shop_order_son_business_05 union all
+                                    select max(o_id) o_id from shop_order_son_business_06 union all
+                                    select max(o_id) o_id from shop_order_son_business_07 union all
+                                    select max(o_id) o_id from shop_order_son_business_08 union all
+                                    select max(o_id) o_id from shop_order_son_business_09) tt limit 1');
+        dd($o_id);
         //查询商家订单子表中的最大的id
-        if(empty($order_son_id)){
+        if(empty($order_sonId)){
             $o_id = DB::selectOne('select max(o_id) o_id from (select max(o_id) o_id from shop_order_son_00 UNION All
                                     select max(o_id) o_id from shop_order_son_business_01 union all
                                     select max(o_id) o_id from shop_order_son_business_02 union all
@@ -84,18 +95,44 @@ class GoodsController extends Controller
                                     select max(o_id) o_id from shop_order_son_business_08 union all
                                     select max(o_id) o_id from shop_order_son_business_09) tt limit 1');
             $order_sonId = $o_id->o_id??0;
-            //存入redis中
-            
-        }else{
-            //查
-            $order_son_id = Redis::incr('order:son:id');
+        }
+        $sql = '
+            select * from shop_order_son_00 where shop_order_son_00.o_id>'.$order_sonId.' union all 
+            select * from shop_order_son_01 where shop_order_son_01.o_id>'.$order_sonId.' union all
+            select * from shop_order_son_02 where shop_order_son_02.o_id>'.$order_sonId.' union all
+            select * from shop_order_son_03 where shop_order_son_03.o_id>'.$order_sonId.' union all
+            select * from shop_order_son_04 where shop_order_son_04.o_id>'.$order_sonId.' union all
+            select * from shop_order_son_05 where shop_order_son_05.o_id>'.$order_sonId.' union all
+            select * from shop_order_son_06 where shop_order_son_06.o_id>'.$order_sonId.' union all
+            select * from shop_order_son_07 where shop_order_son_07.o_id>'.$order_sonId.' union all
+            select * from shop_order_son_08 where shop_order_son_08.o_id>'.$order_sonId.' union all
+            select * from shop_order_son_09 where shop_order_son_09.o_id>'.$order_sonId.'
+        ';
+        $order_son_info = DB::select($sql);
+        if($order_son_info){
+            $max_id=0;
+            foreach ($order_son_info as $k=>$v){
+                //取出最大id
+                if($v->o_id>$max_id){
+                    $max_id = $v->o_id;
+                }
+                $data = collect($v)->toArray();
+                $shop_id = $data['shop_id'];
+                $table = 'shop_order_son_business_0'.($shop_id%10);
+                $order_model = new Order();
+                $order_model->table=$table;
+                $res = $order_model->insert($data);
+                if(!$res){
+                    return false;
+                }
+            }
+            Redis::set('order:son:id',$max_id);
         }
 
-
-        $orderInfo = Order::get()->toArray();
-        $cart_model = new Cart();
-        dd($orderInfo);
-        $cartInfo = $cart_model->with('goods')->get()->toArray();
-        dd($cartInfo);
+//        $orderInfo = Order::get()->toArray();
+//        $cart_model = new Cart();
+//        dd($orderInfo);
+//        $cartInfo = $cart_model->with('goods')->get()->toArray();
+//        dd($cartInfo);
     }
 }
